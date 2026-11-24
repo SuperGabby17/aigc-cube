@@ -19,5 +19,12 @@
 [data-direction="Right"] .hint { right:var(--pad); left:auto; top:43%; transform:translateY(-50%); flex-direction:row-reverse; }
 [data-direction="Up"] .hint { top:clamp(92px,17%,180px); }
 .tracks { margin-left:auto; }
+@font-face {font-family:Ximai;src:url('ximai-cues.ttf') format('truetype');font-display:swap}
+main {background:#080f14}
+#lightCube {position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+header,footer {z-index:1}
+#label {font:normal clamp(23px,4.8vw,38px)/1.2 Ximai,sans-serif}
+.hint {color:#edfbff;background:rgba(7,18,25,.82)}
+.arrow {color:#90ddff}
 </style>
-<main id="poster"><header><b><i class="mark"></i>AIGC先锋学会</b><span class="count"><strong id="num">01</strong> / 04</span></header><div class="stage" aria-hidden="true"><div class="world" id="world"></div></div><h1>AIGC先锋学会</h1><h2 id="end" aria-hidden="true">AIGC1111</h2><div class="hint" aria-live="polite"><span class="arrow" aria-hidden="true"></span><span id="label"></span></div><footer><button id="replay" hidden>重新体验 ↻</button><div class="tracks" aria-hidden="true"><i></i><i></i><i></i><i></i></div></footer></main><script src="cube.js?v=2"></script></html>
+<main id="poster"><header><b><i class="mark"></i>AIGC先锋学会</b><span class="count"><strong id="num">01</strong> / 04</span></header><canvas id="lightCube" aria-hidden="true"></canvas><h1>AIGC先锋学会</h1><h2 id="end" aria-hidden="true">AIGC1111</h2><div class="hint" aria-live="polite"><span class="arrow" aria-hidden="true"></span><span id="label"></span></div><footer><button id="replay" hidden>重新体验 ↻</button><div class="tracks" aria-hidden="true"><i></i><i></i><i></i><i></i></div></footer></main><script src="cube.js?v=ice1"></script></html>
