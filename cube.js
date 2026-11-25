@@ -56,7 +56,7 @@ function chooseLayer(hit,dx,dy){
   return best;
 }
 function releaseLayer(commit){
-  if(!twist)return;
+  if(!twist){wake();return;}
   const end=commit?Math.sign(twist.angle)*Math.PI/2:0;
   settle={start:performance.now(),from:twist.angle,end};
   wake();
@@ -90,6 +90,24 @@ function resize(){
 function poly(c,points){
   c.beginPath();c.moveTo(...points[0]);for(let i=1;i<points.length;i++)c.lineTo(...points[i]);c.closePath();
 }
+function drawCore(x,y,amount){
+  if(amount<.005)return;
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.scale(scale,scale);
+  ctx.globalAlpha*=amount;
+  const halo=ctx.createRadialGradient(0,0,.15,0,0,1.35);
+  halo.addColorStop(0,'#c9fbff');halo.addColorStop(.36,'rgba(94,215,255,.85)');
+  halo.addColorStop(1,'rgba(42,156,226,0)');
+  ctx.fillStyle=halo;ctx.fillRect(-1.35,-1.35,2.7,2.7);
+  const vertices=[[0,-.58],[.42,-.20],[.35,.27],[0,.55],[-.36,.22],[-.4,-.21]];
+  const colors=['#ccfaff','#72dbff','#3996c7','#79d7f5','#b1f6ff','#f1ffff'];
+  vertices.forEach((v,i)=>{
+    poly(ctx,[[-.09,-.12],v,vertices[(i+1)%vertices.length]]);
+    ctx.fillStyle=colors[i];ctx.fill();
+  });
+  ctx.restore();
+}
 function wake(){if(!handle&&!document.hidden)handle=requestAnimationFrame(frame);}
 function frame(now){
   handle=0;
@@ -104,12 +122,21 @@ function frame(now){
   };
   const project=([x,y,z])=>[cx+x*scale*10/(10-z),cy+y*scale*10/(10-z)];
   projectWorld=v=>project(view(v));
-  const age=burst===null?0:clamp((now-burst)/(reduced.matches?1:1100),0,1);
+  const elapsed=burst===null?0:Math.max(0,now-burst);
+  const chargeDuration=reduced.matches?0:650;
+  const charge=burst===null?0:Math.min(1,elapsed/Math.max(1,chargeDuration));
+  const age=burst===null?0:clamp((elapsed-chargeDuration)/(reduced.matches?1:1100),0,1);
+  const opening=twist?Math.sin(2*Math.abs(twist.angle)):0;
+  const exposure=Math.max(opening,charge)*(1-age);
+  const coreView=view([.32,-.42,.84]);
+  const [coreX,coreY]=project(coreView);
   const alpha=1-clamp(age,0,1),polys=[],shadows=[];
   for(const p of pieces){
     const selected=twist&&p.pos[twist.index]===twist.layer;
     const turnVector=v=>selected?rot(v,twist.axis,twist.angle):v;
     let center=turnVector(p.pos);
+    // The channels widen slightly at mid-turn, then close as the layer aligns.
+    center=center.map(v=>v*(1+.23*opening+.09*charge));
     if(age)center=center.map((v,i)=>v+p.velocity[i]*age*1.5);
     const orient=v=>view(age?rot(v,'x',p.spin*age):turnVector(v));
     const cv=view(center),verts=corners.map(v=>orient(v).map((n,i)=>n+cv[i])),screen=verts.map(project);
@@ -120,7 +147,10 @@ function frame(now){
       const points=ids.map(j=>screen[j]);
       const inward=Math.max(0,-(n[0]*cv[0]+n[1]*cv[1]+n[2]*cv[2]));
       const power=clamp(inward*.70+.12*n[0]-.14*n[1]+.04,0,1);
-      polys.push({piece:p,normal:normals[i],points,z:ids.reduce((s,j)=>s+verts[j][2],0)/4,power,n});
+      const distance=Math.hypot(...p.pos);
+      const wave=charge?clamp(charge*3.7-distance,0,1):0;
+      const rim=Math.max(wave,selected ? .68 : 0,pointer?.hit.piece===p?1:0);
+      polys.push({rim,piece:p,normal:normals[i],points,z:ids.reduce((s,j)=>s+verts[j][2],0)/4,power,n});
     });
   }
   polys.sort((a,b)=>a.z-b.z);
@@ -162,15 +192,23 @@ function frame(now){
   const floor=cy+scale*2.08;
   ctx.translate(0,floor*1.40);
   ctx.scale(1,-.40);
+  ctx.globalAlpha=.24*alpha;
+  drawCore(coreX,coreY,exposure);
   for(const face of polys){
     const y=face.points.reduce((sum,p)=>sum+p[1],0)/face.points.length;
     ctx.globalAlpha=alpha*.15*clamp(1-(floor-y)/(4.2*scale),0,1);
     poly(ctx,face.points);
     ctx.fillStyle=face.power>.35?'#56869b':'#263e4c';
-    ctx.fill();ctx.strokeStyle='#75b9d5';ctx.lineWidth=.8;ctx.stroke();
+    ctx.fill();ctx.strokeStyle='#75b9d5';ctx.lineWidth=.8+face.rim;ctx.stroke();
   }
   ctx.restore();
-  for(const {points,power,n} of polys){
+  let coreDrawn=false;
+  for(const {points,power,n,rim,z} of polys){
+    if(!coreDrawn&&z>=coreView[2]){
+      // Nearer blocks occlude the crystal; the openings expose it while dragging.
+      drawCore(coreX,coreY,exposure);
+      coreDrawn=true;
+    }
     const x=points.reduce((s,v)=>s+v[0],0)/4,y=points.reduce((s,v)=>s+v[1],0)/4;
     const dx=sx-x,dy=sy-y,dist=Math.hypot(dx,dy)||1,reach=scale*.52;
     const g=ctx.createLinearGradient(x+dx/dist*reach,y+dy/dist*reach,x-dx/dist*reach,y-dy/dist*reach);
@@ -178,6 +216,10 @@ function frame(now){
     g.addColorStop(0,'rgb('+Math.round(4+b*55)+','+Math.round(10+b*112)+','+Math.round(15+b*138)+')');
     g.addColorStop(1,'rgb(3,'+Math.round(6+b*40)+','+Math.round(10+b*53)+')');
     poly(ctx,points);ctx.fillStyle=g;ctx.fill();ctx.strokeStyle='rgba(147,216,244,'+(.16+.42*power)+')';ctx.lineWidth=.7;ctx.stroke();
+    if(rim){
+      ctx.strokeStyle='rgba(142,226,255,'+(.85*rim)+')';
+      ctx.lineWidth=.8+rim;ctx.stroke();
+    }
   }
   // Light spilling out through the front, top and side channels also catches the rims.
   ctx.globalCompositeOperation='lighter';
@@ -206,13 +248,14 @@ poster.addEventListener('pointerdown',e=>{
     const hit=hitFaces[i];
     if(!containsPoint(hit.points,x,y))continue;
     pointer={id:e.pointerId,startX:e.clientX,startY:e.clientY,hit};
-    poster.setPointerCapture(e.pointerId);
+    poster.setPointerCapture(e.pointerId);wake();
     break;
   }
 });
 function trackPointer(e){
   if(!pointer||pointer.id!==e.pointerId)return;
   const dx=e.clientX-pointer.startX,dy=e.clientY-pointer.startY;
+  if(twist&&Math.hypot(dx,dy)<4){twist=null;wake();}
   if(!twist&&Math.hypot(dx,dy)>=4)twist=chooseLayer(pointer.hit,dx,dy);
   if(!twist)return;
   const travel=dx*twist.tangent[0]+dy*twist.tangent[1];
