@@ -10,13 +10,12 @@ main{position:relative;width:min(100vw,80svh);height:100vh;height:100svh;overflo
 #person.found{background-image:url(sunflower-offer.png)}#person canvas{display:block;width:100%;height:100%;opacity:0}
 header,footer{position:absolute;left:0;right:0;z-index:1;pointer-events:none}
 header{top:0;padding:max(26px,env(safe-area-inset-top)) 24px 40px;background:linear-gradient(#181d1178,transparent);display:flex;align-items:baseline;gap:10px}header b{font:500 26px/1 Georgia,serif;letter-spacing:-.05em}header span{font-size:11px;letter-spacing:.18em}
-footer{bottom:0;padding:50px 24px max(24px,env(safe-area-inset-bottom));background:linear-gradient(transparent,#191d19bd)}#hint{font:500 18px/1.4 Georgia,"Songti SC",SimSun,serif;letter-spacing:.09em;margin:0 0 14px;text-shadow:0 1px 6px #0008}
-.controls{display:flex;align-items:center;gap:10px;pointer-events:auto}.controls input{flex:1;min-width:0;accent-color:#ffe9bb;cursor:pointer;height:32px}.controls output{font:13px Georgia,serif;min-width:43px;text-align:right;font-variant-numeric:tabular-nums}
+footer{bottom:0;padding:0 24px max(24px,env(safe-area-inset-bottom))}#hint{font:500 18px/1.4 Georgia,"Songti SC",SimSun,serif;letter-spacing:.09em;margin:0;text-shadow:0 1px 6px #0008}
 @keyframes offerFallback{0%,30%{background-image:url(sunflower-surprise.png)}100%{background-image:url(sunflower-offer.png)}}
 #person.found.fallback{animation:offerFallback 2.45s both}
 </style></head><body><main><div id="stage" aria-label="香港街景，单指环顾街道，双指靠近或退后"><div id="scene"><img id="photo" src="harbour-street.jpg" alt="香港街道向下延伸至海港，两侧是楼房，远处可见船只和大桥"><div id="person" role="img" aria-label="在街口手持花束的短发女孩"><canvas></canvas></div></div></div>
 <header><b>香港</b><span>HONG KONG</span></header>
-<footer><p id="hint" aria-live="polite">单指环顾街道，双指靠近寻找她</p><div class="controls"><input id="zoom" type="range" min="0" max="100" step=".1" value="0" aria-label="街景放大程度"><output id="ratio">1.0×</output></div></footer></main>
-<script defer src="harbour-3d.js?v=walk6"></script></body></html>
+<footer><p id="hint" aria-live="polite">单指环顾街道，双指靠近寻找她</p></footer></main>
+<script defer src="harbour-3d.js?v=walk7"></script></body></html>
 
 
