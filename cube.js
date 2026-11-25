@@ -126,27 +126,40 @@ function drawCore(x,y,amount){
   ctx.restore();
 }
 // Each group of 5 x 5 x 5 points converges onto one of the 27 pieces.
-function drawFluid(time,blend,project,view){
+function easeRange(value,start,end){
+  const t=clamp((value-start)/(end-start),0,1);
+  return t*t*(3-2*t);
+}
+function drawFluid(time,progress,project,view){
+  const blend=easeRange(progress,0,.68);
+  const visibility=1-easeRange(progress,.48,.98);
   const angle=time*.44+.34;
   const buckets=[[],[],[],[]];
   const floor=cy+scale*2.08;
+  const tapAngle=assemblyStart===null||reduced.matches?angle:(assemblyStart-introStart)*.00044+.34;
+  const angles=[1,.83,.67].map(factor=>{
+    const anchor=tapAngle*factor;
+    const phase=Math.atan2(Math.sin(anchor),Math.cos(anchor))+(angle-tapAngle)*factor;
+    return phase*(1-blend);
+  });
   for(const dot of dots){
-    let [x,y,z]=rot(rot(rot(dot.grid,'y',angle),'z',angle*.83),'x',angle*.67);
-    x+=.26*Math.sin(time*1.6+y*1.45);
-    y+=.21*Math.cos(time*2.1+z*1.2);
-    const target=view(dot.solid);
-    const position=[x,y,z].map((n,i)=>n+(target[i]-n)*blend);
+    const grid=dot.grid.map((v,i)=>v+(dot.solid[i]-v)*blend);
+    let [x,y,z]=rot(rot(rot(grid,'y',angles[0]),'z',angles[1]),'x',angles[2]);
+    x+=(1-blend)*.26*Math.sin(time*1.6+y*1.45);
+    y+=(1-blend)*.21*Math.cos(time*2.1+z*1.2);
+    const aligned=view([x,y,z]);
+    const position=[x,y,z].map((v,i)=>v+(aligned[i]-v)*blend);
     buckets[clamp(Math.floor((position[2]+2)*.95),0,3)].push(project(position));
   }
   ctx.save();
   ctx.globalCompositeOperation='lighter';
   const haze=ctx.createRadialGradient(cx,cy,0,cx,cy,scale*2.55);
   haze.addColorStop(0,'rgba(62,164,214,.28)');haze.addColorStop(1,'rgba(30,100,150,0)');
-  ctx.globalAlpha=1-blend;ctx.fillStyle=haze;
+  ctx.globalAlpha=visibility;ctx.fillStyle=haze;
   ctx.fillRect(cx-scale*2.55,cy-scale*2.55,scale*5.1,scale*5.1);
   buckets.forEach((points,i)=>{
     const size=Math.max(1,scale*(.014+.006*i));
-    const opacity=(1-blend)*(.18+.15*i);
+    const opacity=visibility*(.18+.15*i);
     ctx.fillStyle=i<2?'#59bfe9':'#c1f2ff';
     ctx.globalAlpha=opacity;
     for(const [x,y] of points)ctx.fillRect(x,y,size,size);
@@ -162,10 +175,11 @@ function frame(now){
   if(!reduced.matches&&now-previous<30){wake();return;}previous=now;
   const time=reduced.matches?0:now*.00065;
   advanceLayer(now);
-  const progress=assemblyStart===null?0:clamp((now-assemblyStart)/(reduced.matches?1:580),0,1);
-  const assembly=progress*progress*(3-2*progress);
+  const progress=assemblyStart===null?0:clamp((now-assemblyStart)/(reduced.matches?220:1850),0,1);
+  const surface=easeRange(progress,.54,.96);
+  const outline=easeRange(progress,.38,.82);
   if(progress===1&&intro){intro=false;assemblyStart=null;}
-  if(!intro&&!pointer&&!twist)poseTime=time;
+  if(!pointer&&!twist)poseTime=time;
   const view=v=>{
     const point=[0,1,2].map(i=>v[0]*basis[0][i]+v[1]*basis[1][i]+v[2]*basis[2][i]);
     return rot(rot(point,'y',Math.sin(poseTime)*.115),'x',Math.sin(poseTime*.81)*.05);
@@ -186,7 +200,7 @@ function frame(now){
   const exposure=Math.max(opening,charge)*(1-age);
   const coreView=view([.32,-.42,.84]);
   const [coreX,coreY]=project(coreView);
-  const alpha=(1-clamp(age,0,1))*(intro?assembly:1),polys=[],shadows=[];
+  const alpha=(1-clamp(age,0,1))*(intro?surface:1),polys=[],shadows=[];
   for(const p of pieces){
     const selected=twist&&p.pos[twist.index]===twist.layer;
     const turnVector=v=>selected?rot(v,twist.axis,twist.angle):v;
@@ -271,7 +285,8 @@ function frame(now){
     const b=.10+.09*(1-Math.max(0,n[2]))+power*.84;
     g.addColorStop(0,'rgb('+Math.round(4+b*55)+','+Math.round(10+b*112)+','+Math.round(15+b*138)+')');
     g.addColorStop(1,'rgb(3,'+Math.round(6+b*40)+','+Math.round(10+b*53)+')');
-    poly(ctx,points);ctx.fillStyle=g;ctx.fill();ctx.strokeStyle='rgba(147,216,244,'+(.16+.42*power)+')';ctx.lineWidth=.7;ctx.stroke();
+    ctx.globalAlpha=alpha;poly(ctx,points);ctx.fillStyle=g;ctx.fill();
+    ctx.globalAlpha=intro?outline:alpha;ctx.strokeStyle='rgba(147,216,244,'+(.16+.42*power)+')';ctx.lineWidth=.7;ctx.stroke();
     if(rim){
       ctx.strokeStyle='rgba(142,226,255,'+(.85*rim)+')';
       ctx.lineWidth=.8+rim;ctx.stroke();
@@ -294,8 +309,10 @@ function frame(now){
   ctx.globalCompositeOperation='source-over';
   ctx.globalAlpha=1;
   if(intro){
-    const elapsedSeconds=reduced.matches?0:(now-introStart)/1000;
-    drawFluid(elapsedSeconds,assembly,project,view);
+    const secondsSinceTap=Math.max(0,now-assemblyStart)/1000;
+    const phaseAtTap=(assemblyStart-introStart)/1000;
+    const elapsedSeconds=reduced.matches?0:phaseAtTap+.34*(1-Math.exp(-secondsSinceTap/.34));
+    drawFluid(elapsedSeconds,progress,project,view);
   }
   if(age>.68){poster.classList.add('done');el('end').setAttribute('aria-hidden','false');el('replay').hidden=false;}
   if(age<1&&(!reduced.matches||assemblyStart!==null||settle||burst!==null))wake();
