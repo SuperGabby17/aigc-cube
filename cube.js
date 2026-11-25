@@ -5,16 +5,12 @@ const ctx = canvas.getContext('2d');
 const mask = document.createElement('canvas');
 const light = mask.getContext('2d');
 const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-const moves = [
-  ['Left','左','←','y',0,-1], ['Down','下','↓','x',1,-1],
-  ['Right','右','→','y',-1,1], ['Up','上','↑','x',0,1]
-];
 const faces = [
   [0,2,3,1],[4,5,7,6],[0,1,5,4],[2,6,7,3],[0,4,6,2],[1,3,7,5]
 ];
 const normals = [[0,0,-1],[0,0,1],[0,-1,0],[0,1,0],[-1,0,0],[1,0,0]];
 const corners = Array.from({length:8},(_,i)=>[(i&1)?1:-1,(i&2)?1:-1,(i&4)?1:-1].map(n=>n*.39));
-let width,height,scale,cx,cy,pieces,step,turn,burst,pointer,handle,previous=0;
+let width,height,scale,cx,cy,pieces,step,basis,burst,pointer,handle,previous=0;
 const el = id=>document.getElementById(id);
 const clamp = (v,a,b)=>Math.min(b,Math.max(a,v));
 function rot([x,y,z],axis,a){
@@ -22,22 +18,27 @@ function rot([x,y,z],axis,a){
   return axis==='x'?[x,y*c-z*s,y*s+z*c]:[x*c+z*s,y,z*c-x*s];
 }
 function reset(){
-  pieces=[];step=0;turn=null;burst=null;pointer=null;
+  pieces=[];step=0;basis=[[1,0,0],[0,1,0],[0,0,1]].map(v=>rot(rot(v,"y",-.48),"x",-.37));burst=null;pointer=null;
   for(let x=-1;x<=1;x++)for(let y=-1;y<=1;y++)for(let z=-1;z<=1;z++)
     pieces.push({pos:[x,y,z],velocity:[x*2+Math.random()-.5,y*2+Math.random()-.5,z*1.8],spin:Math.random()*4-2});
   poster.classList.remove('done','burst');el('replay').hidden=true;el('end').setAttribute('aria-hidden','true');
-  document.querySelector('.hint').hidden=false;promptMove();wake();
+  updateProgress();wake();
 }
-function promptMove(){
+function updateProgress(){
   el('num').textContent='0'+Math.min(4,step+1);
   document.querySelectorAll('.tracks i').forEach((e,i)=>e.classList.toggle('on',i<step));
-  if(step<4){const [key,label,arrow]=moves[step];poster.dataset.direction=key;el('label').textContent='向'+label+'滑动';document.querySelector('.arrow').textContent=arrow;}
 }
-function move(key){
-  if(turn||burst!==null||step>=4)return;
-  const [expected,label,,axis,layer,sign]=moves[step];
-  if(expected!==key){el('label').textContent='请向'+label+'滑动';return;}
-  turn={axis,sign,layer,start:performance.now(),slice:new Set(pieces.filter(p=>p.pos[axis==='x'?0:1]===layer))};wake();
+// Apply drag deltas around screen axes so reversing direction always follows the finger.
+function dragBy(dx,dy){
+  const sensitivity=1.4/Math.max(scale*2,90);
+  basis=basis.map(v=>rot(rot(v,'y',dx*sensitivity),'x',-dy*sensitivity));
+  wake();
+}
+function finishDrag(){
+  step++;
+  updateProgress();
+  if(step===4){burst=performance.now();poster.classList.add('burst');}
+  wake();
 }
 function resize(){
   width=poster.clientWidth;height=poster.clientHeight;cx=width*.5;cy=height*.43;
@@ -54,29 +55,20 @@ function frame(now){
   handle=0;
   if(!width)return;
   if(!reduced.matches&&now-previous<30){wake();return;}previous=now;
-  let angle=0,kick=0;
-  if(turn){
-    const t=clamp((now-turn.start)/(reduced.matches?1:720),0,1);
-    angle=turn.sign*Math.PI*.5*(t*t*(3-2*t));kick=Math.sin(Math.PI*t);
-    if(t===1){
-      for(const p of turn.slice)p.pos=rot(p.pos,turn.axis,angle).map(Math.round);
-      turn=null;angle=0;step++;promptMove();
-      if(step===4){burst=now;poster.classList.add('burst');document.querySelector('.hint').hidden=true;}
-    }
-  }
   const time=reduced.matches?0:now*.00065;
-  const yaw=-.48+Math.sin(time)*.115+(turn?.axis==='y'?turn.sign*kick*.09:0);
-  const pitch=-.37+Math.sin(time*.81)*.05+(turn?.axis==='x'?turn.sign*kick*.07:0);
-  const view=v=>rot(rot(v,'y',yaw),'x',pitch);
+  const view=v=>{
+    const point=[0,1,2].map(i=>v[0]*basis[0][i]+v[1]*basis[1][i]+v[2]*basis[2][i]);
+    return rot(rot(point,'y',Math.sin(time)*.115),'x',Math.sin(time*.81)*.05);
+  };
   const project=([x,y,z])=>[cx+x*scale*10/(10-z),cy+y*scale*10/(10-z)];
-  const age=burst===null?0:(now-burst)/(reduced.matches?1:1100);
-  const alpha=1-clamp(age,0,1),polys=[];
+  const age=burst===null?0:clamp((now-burst)/(reduced.matches?1:1100),0,1);
+  const alpha=1-clamp(age,0,1),polys=[],shadows=[];
   for(const p of pieces){
-    const selected=turn?.slice.has(p);
-    let center=selected?rot(p.pos,turn.axis,angle):p.pos;
+    let center=p.pos;
     if(age)center=center.map((v,i)=>v+p.velocity[i]*age*1.5);
-    const orient=v=>view(age?rot(v,'x',p.spin*age):selected?rot(v,turn.axis,angle):v);
+    const orient=v=>view(age?rot(v,'x',p.spin*age):v);
     const cv=view(center),verts=corners.map(v=>orient(v).map((n,i)=>n+cv[i])),screen=verts.map(project);
+    shadows.push(cv);
     faces.forEach((ids,i)=>{
       const n=orient(normals[i]);
       if(n[2]*(10-cv[2])-n[0]*cv[0]-n[1]*cv[1]<.001)return;
@@ -102,10 +94,36 @@ function frame(now){
   ctx.globalCompositeOperation='lighter';
   for(let j=40;j>=0;j--){
     const t=j/40,w=span*(1+1.94*t*t);
-    ctx.globalAlpha=alpha*(j===0?.76:.052*(1-.65*t))*(1+kick*.13);
+    ctx.globalAlpha=alpha*(j===0?.76:.052*(1-.65*t));
     ctx.drawImage(mask,sx-w/2,sy-w/2,w,w);
   }
   ctx.globalCompositeOperation='source-over';ctx.globalAlpha=alpha;
+  // The low side light casts each block onto the same ground plane.
+  ctx.save();
+  ctx.translate(cx,cy+scale*2.30);
+  ctx.scale(scale,scale*.24);
+  for(const [x,y,z] of shadows){
+    const heightAboveGround=Math.max(0,2.3-y);
+    const px=x+.32*heightAboveGround,py=-z+.18*heightAboveGround;
+    const radius=.74+.16*heightAboveGround;
+    const shade=ctx.createRadialGradient(px,py,0,px,py,radius);
+    shade.addColorStop(0,'rgba(0,3,6,.42)');shade.addColorStop(1,'rgba(0,3,6,0)');
+    ctx.fillStyle=shade;ctx.fillRect(px-radius,py-radius,2*radius,2*radius);
+  }
+  ctx.restore();
+  // Reflect the visible faces across the floor and fade the distant ones.
+  ctx.save();
+  const floor=cy+scale*2.08;
+  ctx.translate(0,floor*1.40);
+  ctx.scale(1,-.40);
+  for(const face of polys){
+    const y=face.points.reduce((sum,p)=>sum+p[1],0)/face.points.length;
+    ctx.globalAlpha=alpha*.15*clamp(1-(floor-y)/(4.2*scale),0,1);
+    poly(ctx,face.points);
+    ctx.fillStyle=face.power>.35?'#56869b':'#263e4c';
+    ctx.fill();ctx.strokeStyle='#75b9d5';ctx.lineWidth=.8;ctx.stroke();
+  }
+  ctx.restore();
   for(const {points,power,n} of polys){
     const x=points.reduce((s,v)=>s+v[0],0)/4,y=points.reduce((s,v)=>s+v[1],0)/4;
     const dx=sx-x,dy=sy-y,dist=Math.hypot(dx,dy)||1,reach=scale*.52;
@@ -119,32 +137,48 @@ function frame(now){
   ctx.globalCompositeOperation='lighter';
   const lamps=[[-.5,.5,1.22],[-.5,-.5,1.15],[.5,-1.13,-.5],[1.2,.5,-.5]];
   lamps.forEach((v,i)=>{
-    const active=turn && Math.abs(v[turn.axis==='x'?0:1]-turn.layer)<=.51;
-    const pos=view(active?rot(v,turn.axis,angle):v);
+    const pos=view(v);
     const [x,y]=project(pos),radius=scale*(1.13+i*.06);
     const g=ctx.createRadialGradient(x,y,0,x,y,radius);
     g.addColorStop(0,'rgba(140,225,255,.82)');
     g.addColorStop(.18,'rgba(80,184,234,.49)');
     g.addColorStop(.53,'rgba(40,130,184,.21)');
     g.addColorStop(1,'rgba(25,100,150,0)');
-    ctx.globalAlpha=alpha*(.70+.15*Math.sin(time+i)+kick*.18);
+    ctx.globalAlpha=alpha*(.70+.15*Math.sin(time+i));
     ctx.fillStyle=g;ctx.fillRect(x-radius,y-radius,radius*2,radius*2);
   });
   ctx.globalCompositeOperation='source-over';
   ctx.globalAlpha=1;
   if(age>.68){poster.classList.add('done');el('end').setAttribute('aria-hidden','false');el('replay').hidden=false;}
-  if(age<1&&(!reduced.matches||turn||burst!==null))wake();
+  if(age<1&&(!reduced.matches||burst!==null))wake();
 }
 poster.addEventListener('pointerdown',e=>{
-  if(!e.isPrimary||e.button!==0||turn||step===4||e.target.closest('button'))return;
-  pointer={id:e.pointerId,x:e.clientX,y:e.clientY};poster.setPointerCapture(e.pointerId);
+  if(!e.isPrimary||e.button!==0||pointer||step===4||e.target.closest('button'))return;
+  pointer={id:e.pointerId,x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,travel:0};
+  poster.setPointerCapture(e.pointerId);
 });
+function trackPointer(e){
+  if(!pointer||pointer.id!==e.pointerId)return;
+  dragBy(e.clientX-pointer.x,e.clientY-pointer.y);
+  pointer.x=e.clientX;pointer.y=e.clientY;
+  pointer.travel=Math.max(pointer.travel,Math.hypot(e.clientX-pointer.startX,e.clientY-pointer.startY));
+}
+poster.addEventListener('pointermove',trackPointer);
 poster.addEventListener('pointerup',e=>{
   if(!pointer||pointer.id!==e.pointerId)return;
-  const dx=e.clientX-pointer.x,dy=e.clientY-pointer.y;pointer=null;
-  if(Math.max(Math.abs(dx),Math.abs(dy))>=28)move(Math.abs(dx)>Math.abs(dy)?(dx<0?'Left':'Right'):(dy<0?'Up':'Down'));
+  trackPointer(e);
+  const count=pointer.travel>=28;pointer=null;
+  if(count)finishDrag();
 });
-poster.addEventListener('pointercancel',()=>pointer=null);
-document.addEventListener('keydown',e=>{if(e.key.startsWith('Arrow')){e.preventDefault();if(!e.repeat)move(e.key.slice(5));}});
+function cancelPointer(e){if(pointer?.id===e.pointerId)pointer=null;}
+poster.addEventListener('pointercancel',cancelPointer);
+poster.addEventListener('lostpointercapture',cancelPointer);
+const arrows={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
+document.addEventListener('keydown',e=>{
+  const direction=arrows[e.key];
+  if(!direction||step===4||pointer)return;
+  e.preventDefault();
+  if(!e.repeat){dragBy(direction[0]*scale,direction[1]*scale);finishDrag();}
+});
 document.addEventListener('visibilitychange',wake);window.addEventListener('resize',resize);reduced.addEventListener('change',wake);
 el('replay').onclick=reset;reset();resize();
