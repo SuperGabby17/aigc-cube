@@ -12,6 +12,21 @@ const normals = [[0,0,-1],[0,0,1],[0,-1,0],[0,1,0],[-1,0,0],[1,0,0]];
 const corners = Array.from({length:8},(_,i)=>[(i&1)?1:-1,(i&2)?1:-1,(i&4)?1:-1].map(n=>n*.39));
 let width,height,scale,cx,cy,pieces,step,basis,burst,pointer,handle,previous=0;
 let hitFaces=[],projectWorld,twist=null,settle=null,poseTime=0;
+let intro=true,assemblyStart=null,introStart=0;
+const dots=[];
+for(let i=0;i<15;i++)for(let j=0;j<15;j++)for(let k=0;k<15;k++){
+  const indices=[i,j,k];
+  dots.push({
+    grid:indices.map(n=>(n-7)/5),
+    solid:indices.map(n=>Math.floor(n/5)-1+(n%5-2)*.195)
+  });
+}
+function assemble(){
+  if(!intro||assemblyStart!==null)return;
+  assemblyStart=performance.now();
+  el('startCube').hidden=true;
+  wake();
+}
 const axes=["x","y","z"];
 const el = id=>document.getElementById(id);
 const clamp = (v,a,b)=>Math.min(b,Math.max(a,v));
@@ -21,6 +36,8 @@ function rot([x,y,z],axis,a){
   return axis==='x'?[x,y*c-z*s,y*s+z*c]:[x*c+z*s,y,z*c-x*s];
 }
 function reset(){
+  intro=true;assemblyStart=null;introStart=performance.now();poseTime=0;
+  el('startCube').hidden=false;
   twist=null;settle=null;hitFaces=[];pieces=[];step=0;basis=[[1,0,0],[0,1,0],[0,0,1]].map(v=>rot(rot(v,"y",-.48),"x",-.37));burst=null;pointer=null;
   for(let x=-1;x<=1;x++)for(let y=-1;y<=1;y++)for(let z=-1;z<=1;z++)
     pieces.push({pos:[x,y,z],velocity:[x*2+Math.random()-.5,y*2+Math.random()-.5,z*1.8],spin:Math.random()*4-2});
@@ -108,6 +125,36 @@ function drawCore(x,y,amount){
   });
   ctx.restore();
 }
+// Each group of 5 x 5 x 5 points converges onto one of the 27 pieces.
+function drawFluid(time,blend,project,view){
+  const angle=time*.44+.34;
+  const buckets=[[],[],[],[]];
+  const floor=cy+scale*2.08;
+  for(const dot of dots){
+    let [x,y,z]=rot(rot(rot(dot.grid,'y',angle),'z',angle*.83),'x',angle*.67);
+    x+=.26*Math.sin(time*1.6+y*1.45);
+    y+=.21*Math.cos(time*2.1+z*1.2);
+    const target=view(dot.solid);
+    const position=[x,y,z].map((n,i)=>n+(target[i]-n)*blend);
+    buckets[clamp(Math.floor((position[2]+2)*.95),0,3)].push(project(position));
+  }
+  ctx.save();
+  ctx.globalCompositeOperation='lighter';
+  const haze=ctx.createRadialGradient(cx,cy,0,cx,cy,scale*2.55);
+  haze.addColorStop(0,'rgba(62,164,214,.28)');haze.addColorStop(1,'rgba(30,100,150,0)');
+  ctx.globalAlpha=1-blend;ctx.fillStyle=haze;
+  ctx.fillRect(cx-scale*2.55,cy-scale*2.55,scale*5.1,scale*5.1);
+  buckets.forEach((points,i)=>{
+    const size=Math.max(1,scale*(.014+.006*i));
+    const opacity=(1-blend)*(.18+.15*i);
+    ctx.fillStyle=i<2?'#59bfe9':'#c1f2ff';
+    ctx.globalAlpha=opacity;
+    for(const [x,y] of points)ctx.fillRect(x,y,size,size);
+    ctx.globalAlpha=opacity*.12;
+    for(const [x,y] of points)ctx.fillRect(x,floor+(floor-y)*.4,size,size*.65);
+  });
+  ctx.restore();
+}
 function wake(){if(!handle&&!document.hidden)handle=requestAnimationFrame(frame);}
 function frame(now){
   handle=0;
@@ -115,13 +162,22 @@ function frame(now){
   if(!reduced.matches&&now-previous<30){wake();return;}previous=now;
   const time=reduced.matches?0:now*.00065;
   advanceLayer(now);
-  if(!pointer&&!twist)poseTime=time;
+  const progress=assemblyStart===null?0:clamp((now-assemblyStart)/(reduced.matches?1:580),0,1);
+  const assembly=progress*progress*(3-2*progress);
+  if(progress===1&&intro){intro=false;assemblyStart=null;}
+  if(!intro&&!pointer&&!twist)poseTime=time;
   const view=v=>{
     const point=[0,1,2].map(i=>v[0]*basis[0][i]+v[1]*basis[1][i]+v[2]*basis[2][i]);
     return rot(rot(point,'y',Math.sin(poseTime)*.115),'x',Math.sin(poseTime*.81)*.05);
   };
   const project=([x,y,z])=>[cx+x*scale*10/(10-z),cy+y*scale*10/(10-z)];
   projectWorld=v=>project(view(v));
+  if(intro&&assemblyStart===null){
+    ctx.fillStyle='#080f14';ctx.fillRect(0,0,width,height);
+    drawFluid(reduced.matches?0:(now-introStart)/1000,0,project,view);
+    if(!reduced.matches)wake();
+    return;
+  }
   const elapsed=burst===null?0:Math.max(0,now-burst);
   const chargeDuration=reduced.matches?0:650;
   const charge=burst===null?0:Math.min(1,elapsed/Math.max(1,chargeDuration));
@@ -130,7 +186,7 @@ function frame(now){
   const exposure=Math.max(opening,charge)*(1-age);
   const coreView=view([.32,-.42,.84]);
   const [coreX,coreY]=project(coreView);
-  const alpha=1-clamp(age,0,1),polys=[],shadows=[];
+  const alpha=(1-clamp(age,0,1))*(intro?assembly:1),polys=[],shadows=[];
   for(const p of pieces){
     const selected=twist&&p.pos[twist.index]===twist.layer;
     const turnVector=v=>selected?rot(v,twist.axis,twist.angle):v;
@@ -237,11 +293,15 @@ function frame(now){
   });
   ctx.globalCompositeOperation='source-over';
   ctx.globalAlpha=1;
+  if(intro){
+    const elapsedSeconds=reduced.matches?0:(now-introStart)/1000;
+    drawFluid(elapsedSeconds,assembly,project,view);
+  }
   if(age>.68){poster.classList.add('done');el('end').setAttribute('aria-hidden','false');el('replay').hidden=false;}
-  if(age<1&&(!reduced.matches||settle||burst!==null))wake();
+  if(age<1&&(!reduced.matches||assemblyStart!==null||settle||burst!==null))wake();
 }
 poster.addEventListener('pointerdown',e=>{
-  if(!e.isPrimary||e.button!==0||pointer||settle||step===4||e.target.closest('button'))return;
+  if(intro||!e.isPrimary||e.button!==0||pointer||settle||step===4||e.target.closest('button'))return;
   const bounds=canvas.getBoundingClientRect();
   const x=e.clientX-bounds.left,y=e.clientY-bounds.top;
   for(let i=hitFaces.length-1;i>=0;i--){
@@ -277,7 +337,7 @@ poster.addEventListener('lostpointercapture',cancelPointer);
 const arrows={ArrowLeft:['y',-1],ArrowRight:['y',1],ArrowUp:['x',1],ArrowDown:['x',-1]};
 document.addEventListener('keydown',e=>{
   const direction=arrows[e.key];
-  if(!direction||step===4||pointer||settle)return;
+  if(intro||!direction||step===4||pointer||settle)return;
   e.preventDefault();
   if(!e.repeat){
     const [axis,sign]=direction;
@@ -286,4 +346,5 @@ document.addEventListener('keydown',e=>{
   }
 });
 document.addEventListener('visibilitychange',wake);window.addEventListener('resize',resize);reduced.addEventListener('change',wake);
+el('startCube').onclick=assemble;
 el('replay').onclick=reset;reset();resize();
