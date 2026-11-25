@@ -45,7 +45,6 @@ function reset(){
   updateProgress();wake();
 }
 function updateProgress(){
-  el('num').textContent='0'+Math.min(4,step+1);
   document.querySelectorAll('.tracks i').forEach((e,i)=>e.classList.toggle('on',i<step));
 }
 function containsPoint(points,x,y){
