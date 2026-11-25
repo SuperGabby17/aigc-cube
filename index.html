@@ -2,10 +2,11 @@
 <html lang="zh-Hans"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#27322e"><title>香港街角 · 寻花</title>
 <style>
 *{box-sizing:border-box}html,body{height:100%;margin:0;background:#1a211e;color:#fff8ea;font-family:Arial,"Microsoft YaHei",sans-serif}body{display:grid;place-items:center;overflow:hidden}body::before{content:"";position:fixed;inset:-40px;background:linear-gradient(#16221cc9,#18241ddc),url(harbour-street.jpg) center/cover;filter:blur(32px)}
-main{position:relative;width:min(100vw,80svh);height:100vh;height:100svh;overflow:hidden;isolation:isolate;background:#49574e;box-shadow:0 0 70px #1116}
+main{position:relative;width:100vw;width:min(100vw,80svh);height:100vh;height:100svh;overflow:hidden;isolation:isolate;background:#49574e;box-shadow:0 0 70px #1116}
 #stage{position:absolute;inset:0;overflow:hidden;touch-action:none;cursor:grab}#stage:active{cursor:grabbing}
 #scene{position:absolute;inset:0;transform-origin:center}#photo{position:absolute;top:0;left:0;transform-origin:0 0;pointer-events:none;max-width:none}
 #person{position:absolute;left:0;top:0;width:280px;height:400px;transform-origin:50% 96%;pointer-events:none;background:url(sunflower-rest.png) center/contain no-repeat}
+#person:not([style]){visibility:hidden}#photo:not([style]){width:100%;height:100%;object-fit:cover}
 #person:after{content:"";position:absolute;bottom:1.4%;left:30%;width:36%;height:2.5%;border-radius:50%;background:#28241f70;filter:blur(3px);z-index:-1}
 #person.found{background-image:url(sunflower-offer.png)}#person canvas{display:block;width:100%;height:100%;opacity:0}
 header,footer{position:absolute;left:0;right:0;z-index:1;pointer-events:none}
@@ -13,9 +14,105 @@ header{top:0;padding:max(26px,env(safe-area-inset-top)) 24px 40px;background:lin
 footer{bottom:0;padding:0 24px max(24px,env(safe-area-inset-bottom))}#hint{font:500 18px/1.4 Georgia,"Songti SC",SimSun,serif;letter-spacing:.09em;margin:0;text-shadow:0 1px 6px #0008}
 @keyframes offerFallback{0%,30%{background-image:url(sunflower-surprise.png)}100%{background-image:url(sunflower-offer.png)}}
 #person.found.fallback{animation:offerFallback 2.45s both}
-</style></head><body><main><div id="stage" aria-label="香港街景，单指环顾街道，双指靠近或退后"><div id="scene"><img id="photo" src="harbour-street.jpg" alt="香港街道向下延伸至海港，两侧是楼房，远处可见船只和大桥"><div id="person" role="img" aria-label="在街口手持花束的短发女孩"><canvas></canvas></div></div></div>
+</style></head><body><main><div id="stage" aria-label="香港街景，单指环顾街道，双指靠近或退后"><div id="scene"><img id="photo" src="harbour-street.jpg" alt="香港街道向下延伸至海港，两侧是楼房，远处可见船只和大桥"><div id="person" class="fallback" role="img" aria-label="在街口手持花束的短发女孩"><canvas></canvas></div></div></div>
 <header><b>香港</b><span>HONG KONG</span></header>
 <footer><p id="hint" aria-live="polite">单指环顾街道，双指靠近寻找她</p></footer></main>
-<script defer src="harbour-3d.js?v=walk7"></script></body></html>
+<script>(function(){
+const stage=document.querySelector('#stage'), photo=document.querySelector('#photo'), person=document.querySelector('#person');
+const hint=document.querySelector('#hint');
+let draw;
+function usePhoto(){
+  draw=null;
+  const surface=stage.querySelector('#scene > canvas');
+  if(surface)surface.remove();
+}
+window.installStreet=function(create){
+  try{
+    draw=create(stage,photo);
+    stage.querySelector('#scene > canvas').addEventListener('webglcontextlost',()=>{usePhoto();layout()});
+    layout();
+  }catch(error){usePhoto();layout()}
+};
+let zoom=1,yaw=0,pitch=0,found=false;
+const points=new Map(), clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const motion=matchMedia('(prefers-reduced-motion: reduce)');
+let phase=0,lastTime=performance.now(),walkX=0;
+function layout(){
+  const w=stage.clientWidth,h=stage.clientHeight;
+  const now=performance.now(),dt=Math.min(.08,(now-lastTime)/1000);lastTime=now;
+  if(!found&&!motion.matches&&!document.hidden)phase+=dt;
+  // Follow a short street crossing. Smoothly pivot at either end.
+  walkX=motion.matches?0:-.38*Math.sin(phase*.39);
+  person.dataset.heading=String(-1.47*Math.tanh(5*Math.cos(phase*.39)));
+  let p;
+  if(draw){try{p=draw(w,h,zoom,yaw,pitch,walkX,found)}catch(error){usePhoto()}}
+  if(!p){
+    const fit=Math.max(w/736,h/1100)*zoom;
+    const x=clamp(w/2-.473*736*fit-yaw*w*.4,w-736*fit,0),y=clamp(h*.68-.652*1100*fit+pitch*h*.4,h-1100*fit,0);
+    photo.style.cssText='width:'+736*fit+'px;height:'+1100*fit+'px;left:'+x+'px;top:'+y+'px';
+    p={x:x+.473*736*fit,y:y+.652*1100*fit,height:h*.04*zoom,front:true};
+  }
+  person.style.visibility=p.front?'visible':'hidden';
+  if(p.front)person.style.transform='translate('+(p.x-140)+'px,'+(p.y-384)+'px) scale('+p.height/400+')';
+  if(zoom<8)found=false;
+  if(zoom>=12&&p.front&&Math.abs(p.x/w-.5)<.38&&Math.abs((p.y-p.height*.65)/h-.5)<.38)found=true;
+  person.classList.toggle('found',found);
+  hint.textContent=found?'这束花，送给你':draw?'单指环顾街道，双指靠近寻找她':'双指放大街景，寻找捧花的人';
+  window.dispatchEvent(new Event('harbourzoom'));
+}
+function turn(dx,dy){yaw-=dx/stage.clientHeight*2.8;pitch=clamp(pitch+dy/stage.clientHeight*1.8,-.60,.85)}
+function distance(){const [a,b]=points.values();return Math.hypot(a.x-b.x,a.y-b.y)}
+let tap=null,lastTap=null;
+stage.onpointerdown=e=>{
+  if(e.button!==0)return;
+  try{stage.setPointerCapture(e.pointerId)}catch(error){}
+  points.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  tap=points.size===1?{x:e.clientX,y:e.clientY,t:performance.now()}:null;
+};
+stage.onpointermove=e=>{
+  const old=points.get(e.pointerId);if(!old)return;
+  const before=points.size===2?distance():0;
+  points.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(points.size===2&&before>4)zoom=clamp(zoom*distance()/before,1,17);
+  else if(points.size===1)turn(e.clientX-old.x,e.clientY-old.y);
+  layout();
+};
+stage.onpointerup=e=>{
+  if(points.has(e.pointerId))stage.onpointermove(e);
+  if(tap&&performance.now()-tap.t<280&&Math.hypot(e.clientX-tap.x,e.clientY-tap.y)<9){
+    if(lastTap&&performance.now()-lastTap.t<350&&Math.hypot(tap.x-lastTap.x,tap.y-lastTap.y)<30){zoom=zoom>=16?1:Math.min(17,zoom*2.3);layout();lastTap=null}else lastTap=tap;
+  }
+  points.delete(e.pointerId);tap=null;
+};
+stage.onpointercancel=stage.onlostpointercapture=e=>{points.delete(e.pointerId);tap=null};
+if(!window.PointerEvent){
+  let previous=null;
+  function readTouches(list){
+    const a=list[0],b=list[1];if(!a)return null;
+    return {count:list.length,x:a.clientX,y:a.clientY,d:b?Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY):0};
+  }
+  stage.addEventListener('touchstart',e=>{previous=readTouches(e.touches)},{passive:true});
+  stage.addEventListener('touchmove',e=>{
+    e.preventDefault();const next=readTouches(e.touches);
+    if(next&&previous&&next.count===previous.count){
+      if(next.count===2&&previous.d>4)zoom=clamp(zoom*next.d/previous.d,1,17);
+      if(next.count===1)turn(next.x-previous.x,next.y-previous.y);
+      layout();
+    }
+    previous=next;
+  },{passive:false});
+  for(const name of ['touchend','touchcancel'])stage.addEventListener(name,e=>{previous=readTouches(e.touches)});
+}
+stage.addEventListener('wheel',e=>{e.preventDefault();zoom=clamp(zoom*Math.exp(-e.deltaY*.0025),1,17);layout()},{passive:false});
+window.addEventListener('resize',layout);layout();
+let lastWalk=0;
+function patrol(now){
+  if(draw&&!found&&!motion.matches&&now-lastWalk>=40){lastWalk=now;layout()}
+  requestAnimationFrame(patrol);
+}
+requestAnimationFrame(patrol);
+
+})();</script>
+<script defer src="harbour-mobile.js"></script></body></html>
 
 
