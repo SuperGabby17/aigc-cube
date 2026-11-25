@@ -4,15 +4,15 @@
 *{box-sizing:border-box}html,body{height:100%;margin:0;background:#1a211e;color:#fff8ea;font-family:Arial,"Microsoft YaHei",sans-serif}body{display:grid;place-items:center;overflow:hidden}body::before{content:"";position:fixed;inset:-40px;background:linear-gradient(#16221cc9,#18241ddc),url(harbour-street.jpg) center/cover;filter:blur(32px)}
 main{position:relative;width:min(100vw,80svh);height:100vh;height:100svh;overflow:hidden;isolation:isolate;background:#49574e;box-shadow:0 0 70px #1116}
 #stage{position:absolute;inset:0;overflow:hidden;touch-action:none;cursor:grab}#stage:active{cursor:grabbing}
-#photo{position:absolute;top:0;left:0;transform-origin:0 0;pointer-events:none;max-width:none}
+#scene{position:absolute;inset:0;transform-origin:center}#photo{position:absolute;top:0;left:0;transform-origin:0 0;pointer-events:none;max-width:none}
 #person{position:absolute;left:0;top:0;width:280px;height:400px;transform-origin:50% 96%;pointer-events:none;background:url(harbour-portrait.png) center/contain no-repeat}
 #person:after{content:"";position:absolute;bottom:1.4%;left:30%;width:36%;height:2.5%;border-radius:50%;background:#28241f70;filter:blur(3px);z-index:-1}
-#person canvas{display:block;width:100%;height:100%;opacity:0}
+#person.found{background-image:url(harbour-raised.png)}#person canvas{display:block;width:100%;height:100%;opacity:0}
 header,footer{position:absolute;left:0;right:0;z-index:1;pointer-events:none}
 header{top:0;padding:max(26px,env(safe-area-inset-top)) 24px 40px;background:linear-gradient(#181d1178,transparent);display:flex;align-items:baseline;gap:10px}header b{font:500 26px/1 Georgia,serif;letter-spacing:-.05em}header span{font-size:11px;letter-spacing:.18em}
 footer{bottom:0;padding:50px 24px max(24px,env(safe-area-inset-bottom));background:linear-gradient(transparent,#191d19bd)}#hint{font:500 18px/1.4 Georgia,"Songti SC",SimSun,serif;letter-spacing:.09em;margin:0 0 14px;text-shadow:0 1px 6px #0008}
-.controls{display:flex;align-items:center;gap:10px;pointer-events:auto}.controls button{background:#2b302b90;color:inherit;border:1px solid #fff6;border-radius:50%;width:40px;height:40px;font:23px/1 Arial;cursor:pointer}.controls button:disabled{opacity:.45}.controls input{flex:1;min-width:0;accent-color:#ffe9bb;cursor:pointer;height:32px}.controls output{font:13px Georgia,serif;min-width:43px;text-align:right;font-variant-numeric:tabular-nums}
-</style></head><body><main><div id="stage" aria-label="香港街景，双指缩放，单指移动"><img id="photo" src="harbour-street.jpg" alt="香港街道向下延伸至海港，两侧是楼房，远处可见船只和大桥"><div id="person" role="img" aria-label="在街口手持花束的短发女孩"><canvas></canvas></div></div>
+.controls{display:flex;align-items:center;gap:10px;pointer-events:auto}.controls input{flex:1;min-width:0;accent-color:#ffe9bb;cursor:pointer;height:32px}.controls output{font:13px Georgia,serif;min-width:43px;text-align:right;font-variant-numeric:tabular-nums}
+</style></head><body><main><div id="stage" aria-label="香港街景，双指缩放或旋转，单指移动"><div id="scene"><img id="photo" src="harbour-street.jpg" alt="香港街道向下延伸至海港，两侧是楼房，远处可见船只和大桥"><div id="person" role="img" aria-label="在街口手持花束的短发女孩"><canvas></canvas></div></div></div>
 <header><b>香港</b><span>HONG KONG</span></header>
-<footer><p id="hint" aria-live="polite">双指放大，寻找街角的花束</p><div class="controls"><button id="less" aria-label="缩小">−</button><input id="zoom" type="range" min="0" max="100" step=".1" value="0" aria-label="街景放大程度"><button id="more" aria-label="放大">+</button><output id="ratio">1.0×</output></div></footer></main>
-<script src="harbour-view.js"></script><script defer src="harbour-3d.js"></script></body></html>
+<footer><p id="hint" aria-live="polite">双指缩放、旋转，寻找捧花的人</p><div class="controls"><input id="zoom" type="range" min="0" max="100" step=".1" value="0" aria-label="街景放大程度"><output id="ratio">1.0×</output></div></footer></main>
+<script src="harbour-view.js?v=gesture2"></script><script defer src="harbour-3d.js?v=gesture2"></script></body></html>
