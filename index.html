@@ -1,15 +1,18 @@
-<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090909"><title>AIGC先锋学会 · 交互魔方</title>
+<!doctype html>
+<html lang="zh-Hans"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#27322e"><title>香港街角 · 寻花</title>
 <style>
-*{box-sizing:border-box}html,body{margin:0;background:#090909;color:#f7f6f3;font-family:Arial,"Microsoft YaHei",sans-serif}main{height:100vh;height:100svh;position:relative;overflow:hidden;touch-action:pinch-zoom;user-select:none;--s:min(14vw,11vh,90px);--pad:clamp(20px,5vw,80px);background:radial-gradient(ellipse at 50% 42%,#19191a 0, #101011 34%,#090909 72%)}footer{position:absolute;left:var(--pad);right:var(--pad);display:flex;align-items:center;justify-content:space-between}.stage,.world,.piece,.face{position:absolute;transform-style:preserve-3d}.stage{left:50%;top:43%;perspective:1500px}.world{transform:rotateX(-23deg) rotateY(-39deg)}.face{width:var(--s);height:var(--s);left:calc(var(--s)*-.5);top:calc(var(--s)*-.5);border:clamp(1.5px,.5vw,3px) solid #070707;border-radius:5%;background:#141415 center/900% 300% no-repeat;background-origin:padding-box;backface-visibility:hidden}.piece{transition:transform 680ms cubic-bezier(.28,.02,.19,1)}footer{bottom:max(24px,env(safe-area-inset-bottom));padding-top:16px;border-top:1px solid #39393a}button{border:0;background:none;color:inherit;font:600 16px/1.3 inherit}.tracks{display:flex;gap:5px}.tracks i{width:clamp(18px,4vw,40px);height:3px;background:#444}.tracks i.on{background:#daff76}#end{position:absolute;top:50%;width:100%;margin:0;text-align:center;transform:translateY(-50%);font:bold clamp(42px,12vw,150px)/1 Georgia,serif;letter-spacing:-.065em;opacity:0;transition:opacity .55s}.done #end{opacity:1}button{font:600 16px Arial;min-height:44px;cursor:pointer;padding:6px 0}button:focus-visible{outline:2px solid #daff76}#replay{color:#daff76}[hidden]{display:none!important}@media(prefers-reduced-motion:reduce){*{transition-duration:1ms!important}}
-
-.tracks { margin-left:auto; }
-
-main {background:#080f14}
-#lightCube {position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-footer {z-index:1}
-
-
-
-#startCube{position:absolute;inset:0;z-index:3;width:100%;height:100%;padding:0;border:0;background:transparent;cursor:pointer}
-</style>
-<main id="poster"><canvas id="lightCube" aria-hidden="true"></canvas><h2 id="end" aria-hidden="true">AIGC1111</h2><button id="startCube" type="button" aria-label="轻点屏幕，凝聚魔方"></button><footer><button id="replay" hidden>重新体验 ↻</button><div class="tracks" aria-hidden="true"><i></i><i></i><i></i><i></i></div></footer></main><script src="cube.js?v=noheader7"></script></html>
+*{box-sizing:border-box}html,body{height:100%;margin:0;background:#1a211e;color:#fff8ea;font-family:Arial,"Microsoft YaHei",sans-serif}body{display:grid;place-items:center;overflow:hidden}body::before{content:"";position:fixed;inset:-40px;background:linear-gradient(#16221cc9,#18241ddc),url(harbour-street.jpg) center/cover;filter:blur(32px)}
+main{position:relative;width:min(100vw,80svh);height:100vh;height:100svh;overflow:hidden;isolation:isolate;background:#49574e;box-shadow:0 0 70px #1116}
+#stage{position:absolute;inset:0;overflow:hidden;touch-action:none;cursor:grab}#stage:active{cursor:grabbing}
+#photo{position:absolute;top:0;left:0;transform-origin:0 0;pointer-events:none;max-width:none}
+#person{position:absolute;left:0;top:0;width:280px;height:400px;transform-origin:50% 96%;pointer-events:none;background:url(harbour-portrait.png) center/contain no-repeat}
+#person:after{content:"";position:absolute;bottom:1.4%;left:30%;width:36%;height:2.5%;border-radius:50%;background:#28241f70;filter:blur(3px);z-index:-1}
+#person canvas{display:block;width:100%;height:100%;opacity:0}
+header,footer{position:absolute;left:0;right:0;z-index:1;pointer-events:none}
+header{top:0;padding:max(26px,env(safe-area-inset-top)) 24px 40px;background:linear-gradient(#181d1178,transparent);display:flex;align-items:baseline;gap:10px}header b{font:500 26px/1 Georgia,serif;letter-spacing:-.05em}header span{font-size:11px;letter-spacing:.18em}
+footer{bottom:0;padding:50px 24px max(24px,env(safe-area-inset-bottom));background:linear-gradient(transparent,#191d19bd)}#hint{font:500 18px/1.4 Georgia,"Songti SC",SimSun,serif;letter-spacing:.09em;margin:0 0 14px;text-shadow:0 1px 6px #0008}
+.controls{display:flex;align-items:center;gap:10px;pointer-events:auto}.controls button{background:#2b302b90;color:inherit;border:1px solid #fff6;border-radius:50%;width:40px;height:40px;font:23px/1 Arial;cursor:pointer}.controls button:disabled{opacity:.45}.controls input{flex:1;min-width:0;accent-color:#ffe9bb;cursor:pointer;height:32px}.controls output{font:13px Georgia,serif;min-width:43px;text-align:right;font-variant-numeric:tabular-nums}
+</style></head><body><main><div id="stage" aria-label="香港街景，双指缩放，单指移动"><img id="photo" src="harbour-street.jpg" alt="香港街道向下延伸至海港，两侧是楼房，远处可见船只和大桥"><div id="person" role="img" aria-label="在街口手持花束的短发女孩"><canvas></canvas></div></div>
+<header><b>香港</b><span>HONG KONG</span></header>
+<footer><p id="hint" aria-live="polite">双指放大，寻找街角的花束</p><div class="controls"><button id="less" aria-label="缩小">−</button><input id="zoom" type="range" min="0" max="100" step=".1" value="0" aria-label="街景放大程度"><button id="more" aria-label="放大">+</button><output id="ratio">1.0×</output></div></footer></main>
+<script src="harbour-view.js"></script><script defer src="harbour-3d.js"></script></body></html>
